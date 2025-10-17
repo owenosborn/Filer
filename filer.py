@@ -13,7 +13,7 @@ from typing import Optional
 
 
 class FileStore:
-    def __init__(self, db_path: str = "filestore.db", storage_root: str = "storage"):
+    def __init__(self, db_path: str = "filedb.db", storage_root: str = "storage"):
         self.db_path = Path(db_path)
         self.storage_root = Path(storage_root)
         self.storage_root.mkdir(exist_ok=True)

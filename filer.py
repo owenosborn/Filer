@@ -64,21 +64,13 @@ class FileStore:
         # Filter out common root directories
         return [p for p in parts if p not in ('/', '.', '..')]
     
-    def create_sidecar(self, storage_path: Path, file_data: dict):
-        """Create sidecar .meta.json file for disaster recovery."""
-        sidecar_path = Path(str(storage_path) + ".meta.json")
-        with open(sidecar_path, 'w') as f:
-            json.dump(file_data, f, indent=2)
-    
-    def ingest_file(self, filepath: Path, source: str = "local", 
-                   create_sidecar: bool = True) -> dict:
+    def ingest_file(self, filepath: Path, source: str = "local") -> dict:
         """
         Ingest a file into the system.
         
         Args:
             filepath: Path to file to ingest
             source: Source identifier (e.g., "Dropbox", "iCloud", "OldMacDrive")
-            create_sidecar: Whether to create sidecar metadata file
             
         Returns:
             Dict with ingestion results
@@ -159,22 +151,6 @@ class FileStore:
             "discovered_at": datetime.now().isoformat()
         }]
         
-        file_data = {
-            "hash": file_hash,
-            "size": stat.st_size,
-            "original_filename": filepath.name,
-            "file_extension": file_extension,
-            "original_paths": original_paths,
-            "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            "imported_at": datetime.now().isoformat(),
-            "tags": tags
-        }
-        
-        # Create sidecar if requested
-        if create_sidecar:
-            self.create_sidecar(storage_path, file_data)
-        
         # Insert into database
         conn.execute("""
             INSERT INTO files (
@@ -184,7 +160,7 @@ class FileStore:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             file_hash,
-            file_data["size"],
+            stat.st_size,
             file_extension,
             filepath.name,
             datetime.fromtimestamp(stat.st_ctime),
@@ -296,21 +272,11 @@ def main():
     """Example usage."""
     store = FileStore()
     
-    # Example: ingest a single file
-    # store.ingest_file(Path("test.txt"), source="TestData")
-    
     # Example: ingest a directory
     store.ingest_directory(Path("./test_files"), source="TestData", recursive=True)
     
     # Show stats
     store.stats()
-    
-    # Example search
-    # results = store.search(tag="documents")
-    # for hash, paths, size in results:
-    #     print(f"{hash[:8]}... found in {len(paths)} location(s)")
-    #     for p in paths:
-    #         print(f"  - {p['path']} (from {p['source']})")
 
 
 if __name__ == "__main__":

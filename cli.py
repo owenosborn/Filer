@@ -19,7 +19,7 @@ def cmd_ingest(args, store):
         return 1
     
     if path.is_file():
-        result = store.ingest_file(path, source=args.source, create_sidecar=args.sidecar)
+        result = store.ingest_file(path, source=args.source)
         if result["status"] == "error":
             print(f"Error: {result['message']}")
             return 1
@@ -192,8 +192,6 @@ def main():
     ingest_parser.add_argument('--source', default='local', help='Source identifier')
     ingest_parser.add_argument('--recursive', '-r', action='store_true', 
                               help='Recursively ingest directories')
-    ingest_parser.add_argument('--no-sidecar', dest='sidecar', action='store_false',
-                              help='Skip creating sidecar .meta.json files')
     
     # Search command
     search_parser = subparsers.add_parser('search', help='Search for files')

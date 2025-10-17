@@ -27,7 +27,10 @@ class FileStore:
                 hash TEXT PRIMARY KEY,
                 size INTEGER NOT NULL,
                 mime_type TEXT,
+                file_extension TEXT,
+                original_filename TEXT,
                 created_at TIMESTAMP,
+                modified_at TIMESTAMP,
                 imported_at TIMESTAMP NOT NULL,
                 
                 local_path TEXT,
@@ -86,6 +89,9 @@ class FileStore:
         if not filepath.is_file():
             return {"status": "error", "message": "Not a file"}
         
+        # Get file stats
+        stat = filepath.stat()
+        
         # Calculate hash
         print(f"Hashing {filepath.name}...", end=" ")
         file_hash = self.hash_file(filepath)
@@ -136,12 +142,15 @@ class FileStore:
         storage_path = self.get_storage_path(file_hash)
         storage_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Copy file to storage
+        # Copy file to storage (preserves timestamps)
         print(f"  → Copying to {storage_path.relative_to(self.storage_root)}")
         shutil.copy2(filepath, storage_path)
         
         # Extract tags from path
         tags = self.extract_path_tags(filepath)
+        
+        # Extract file extension
+        file_extension = filepath.suffix.lower() if filepath.suffix else ""
         
         # Prepare metadata - store paths as array
         original_paths = [{
@@ -152,9 +161,12 @@ class FileStore:
         
         file_data = {
             "hash": file_hash,
-            "size": filepath.stat().st_size,
-            "original_name": filepath.name,
+            "size": stat.st_size,
+            "original_filename": filepath.name,
+            "file_extension": file_extension,
             "original_paths": original_paths,
+            "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             "imported_at": datetime.now().isoformat(),
             "tags": tags
         }
@@ -166,13 +178,17 @@ class FileStore:
         # Insert into database
         conn.execute("""
             INSERT INTO files (
-                hash, size, created_at, imported_at,
+                hash, size, file_extension, original_filename,
+                created_at, modified_at, imported_at,
                 local_path, original_paths, tags, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             file_hash,
             file_data["size"],
-            datetime.fromtimestamp(filepath.stat().st_mtime),
+            file_extension,
+            filepath.name,
+            datetime.fromtimestamp(stat.st_ctime),
+            datetime.fromtimestamp(stat.st_mtime),
             datetime.now(),
             str(storage_path),
             json.dumps(original_paths),

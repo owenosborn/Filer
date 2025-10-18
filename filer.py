@@ -105,7 +105,7 @@ class FileStore:
             }
             
             # Check if this exact path already recorded
-            if any(p["path"] == str(filepath) for p in existing_paths):
+            if any(p["path"] == str(filepath) and p["source"] == source for p in existing_paths):
                 print(f"  → Already exists (exact path already recorded)")
                 conn.close()
                 return {

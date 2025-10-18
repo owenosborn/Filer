@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Browser</title>
+    <title>File Browser - Table View</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; }
@@ -42,73 +42,132 @@
             border-radius: 4px;
             margin-right: 1rem;
         }
-        
-        .file-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
-            padding: 0 2rem 2rem 2rem;
-        }
-        
-        .file-card {
-            background: white;
-            border-radius: 8px;
-            padding: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
+        .filters button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            background: #3498db;
+            color: white;
             cursor: pointer;
         }
-        .file-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        .filters button:hover { background: #2980b9; }
+        
+        .table-container {
+            background: white;
+            margin: 0 2rem 2rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
         
-        .file-hash {
-            font-family: monospace;
-            color: #3498db;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
+        table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        .file-size { color: #7f8c8d; font-size: 0.9rem; }
-        .file-locations {
-            margin-top: 0.5rem;
-            font-size: 0.85rem;
-            color: #95a5a6;
+        
+        th {
+            background: #34495e;
+            color: white;
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
         }
-        .file-path {
+        
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        
+        .hash { 
+            font-family: monospace; 
+            color: #3498db; 
+            font-size: 0.9rem;
+        }
+        
+        .tag {
+            display: inline-block;
             background: #ecf0f1;
-            padding: 0.3rem;
-            margin-top: 0.3rem;
+            padding: 0.2rem 0.5rem;
             border-radius: 4px;
             font-size: 0.8rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            margin-right: 0.3rem;
         }
         
+        .mime-type {
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+        }
+        
+        /* Modal for preview */
         .modal {
             display: none;
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
             z-index: 1000;
+            overflow: auto;
         }
         .modal-content {
             background: white;
-            margin: 5% auto;
+            margin: 2% auto;
             padding: 2rem;
-            max-width: 800px;
+            max-width: 90%;
+            max-height: 90vh;
             border-radius: 8px;
-            max-height: 80vh;
-            overflow-y: auto;
+            overflow: auto;
         }
         .close {
             float: right;
             font-size: 2rem;
             cursor: pointer;
             color: #7f8c8d;
+            line-height: 1;
         }
+        .close:hover { color: #2c3e50; }
+        
+        .preview-container {
+            margin-top: 1rem;
+            text-align: center;
+        }
+        
+        .preview-container img {
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 4px;
+        }
+        
+        .preview-container audio,
+        .preview-container video {
+            max-width: 100%;
+            margin: 1rem 0;
+        }
+        
+        .preview-container pre {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow: auto;
+            max-height: 60vh;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem 1rem;
+            margin: 1rem 0;
+            text-align: left;
+        }
+        .info-label { font-weight: bold; color: #7f8c8d; }
     </style>
 </head>
 <body>
@@ -134,11 +193,29 @@
     <div class="filters">
         <input type="text" id="filter-tag" placeholder="Filter by tag...">
         <input type="text" id="filter-source" placeholder="Filter by source...">
+        <select id="filter-mime">
+            <option value="">All MIME types</option>
+        </select>
         <button onclick="loadFiles()">Apply Filters</button>
-        <button onclick="clearFilters()">Clear</button>
+        <button onclick="clearFilters()" style="background: #95a5a6;">Clear</button>
     </div>
     
-    <div class="file-grid" id="file-grid"></div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Hash</th>
+                    <th>Filename</th>
+                    <th>Size</th>
+                    <th>MIME Type</th>
+                    <th>Tags</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody id="file-table-body">
+            </tbody>
+        </table>
+    </div>
     
     <div id="modal" class="modal">
         <div class="modal-content">
@@ -148,6 +225,8 @@
     </div>
     
     <script>
+        let allMimeTypes = new Set();
+        
         async function loadStats() {
             const res = await fetch('/api/stats');
             const stats = await res.json();
@@ -159,54 +238,138 @@
         async function loadFiles() {
             const tag = document.getElementById('filter-tag').value;
             const source = document.getElementById('filter-source').value;
+            const mime = document.getElementById('filter-mime').value;
             
             let url = '/api/files?';
             if (tag) url += `tag=${encodeURIComponent(tag)}&`;
             if (source) url += `source=${encodeURIComponent(source)}`;
             
             const res = await fetch(url);
-            const files = await res.json();
+            let files = await res.json();
             
-            const grid = document.getElementById('file-grid');
-            grid.innerHTML = files.map(file => `
-                <div class="file-card" onclick="showFileInfo('${file.hash}')">
-                    <div class="file-hash">${file.hash_short}...</div>
-                    <div class="file-size">${file.size_mb} MB</div>
-                    <div class="file-locations">
-                        ${file.location_count} location${file.location_count > 1 ? 's' : ''}
-                    </div>
-                    ${file.locations.slice(0, 2).map(loc => 
-                        `<div class="file-path" title="${loc.path}">${loc.path.split('/').pop()}</div>`
-                    ).join('')}
-                </div>
+            // Client-side MIME filter (could be server-side too)
+            if (mime) {
+                files = files.filter(f => f.mime_type && f.mime_type.includes(mime));
+            }
+            
+            // Collect MIME types for dropdown
+            files.forEach(f => {
+                if (f.mime_type) allMimeTypes.add(f.mime_type);
+            });
+            updateMimeDropdown();
+            
+            const tbody = document.getElementById('file-table-body');
+            tbody.innerHTML = files.map(file => `
+                <tr onclick="showFilePreview('${file.hash}')">
+                    <td class="hash">${file.hash_short}...</td>
+                    <td>${file.filename || 'N/A'}</td>
+                    <td>${file.size_mb} MB</td>
+                    <td class="mime-type">${file.mime_type || 'unknown'}</td>
+                    <td>${(file.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}</td>
+                    <td>${file.created_at ? new Date(file.created_at).toLocaleDateString() : 'N/A'}</td>
+                </tr>
             `).join('');
         }
         
-        async function showFileInfo(hash) {
+        function updateMimeDropdown() {
+            const select = document.getElementById('filter-mime');
+            const currentValue = select.value;
+            
+            // Keep "All MIME types" option
+            select.innerHTML = '<option value="">All MIME types</option>';
+            
+            // Add sorted MIME types
+            Array.from(allMimeTypes).sort().forEach(mime => {
+                const option = document.createElement('option');
+                option.value = mime;
+                option.textContent = mime;
+                select.appendChild(option);
+            });
+            
+            select.value = currentValue;
+        }
+        
+        async function showFilePreview(hash) {
             const res = await fetch(`/api/file/${hash}/info`);
             const info = await res.json();
             
-            const isImage = info.extension && ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(info.extension);
+            let preview = '';
+            const mime = info.mime_type || '';
+            const fileUrl = `/file/${hash}`;
+            
+            // Generate preview based on MIME type
+            if (mime.startsWith('image/')) {
+                preview = `<div class="preview-container"><img src="${fileUrl}" alt="Preview"></div>`;
+            } else if (mime.startsWith('video/')) {
+                preview = `<div class="preview-container"><video controls src="${fileUrl}"></video></div>`;
+            } else if (mime.startsWith('audio/')) {
+                preview = `<div class="preview-container"><audio controls src="${fileUrl}"></audio></div>`;
+            } else if (mime.startsWith('text/') || mime === 'application/json') {
+                // Fetch and display text content
+                const textRes = await fetch(fileUrl);
+                const text = await textRes.text();
+                const truncated = text.length > 5000 ? text.substring(0, 5000) + '\n\n... (truncated)' : text;
+                preview = `<div class="preview-container"><pre>${escapeHtml(truncated)}</pre></div>`;
+            } else if (mime === 'application/pdf') {
+                preview = `<div class="preview-container"><iframe src="${fileUrl}" width="100%" height="600px" style="border:none; border-radius:4px;"></iframe></div>`;
+            } else {
+                preview = `<div class="preview-container"><p>No preview available for this file type.</p><p><a href="${fileUrl}" target="_blank">Download file</a></p></div>`;
+            }
             
             document.getElementById('modal-body').innerHTML = `
-                <h2>File Details</h2>
-                ${isImage ? `<img src="/file/${hash}" style="max-width:100%; margin:1rem 0; border-radius:4px;">` : ''}
-                <p><strong>Hash:</strong> <code>${info.hash}</code></p>
-                <p><strong>Filename:</strong> ${info.filename || 'N/A'}</p>
-                <p><strong>Size:</strong> ${info.size_mb} MB</p>
-                <p><strong>Extension:</strong> ${info.extension || 'N/A'}</p>
-                <p><strong>Imported:</strong> ${info.imported_at}</p>
-                <h3>Locations (${info.locations.length})</h3>
+                <h2>File Preview</h2>
+                ${preview}
+                <div class="info-grid">
+                    <span class="info-label">Hash:</span>
+                    <span><code>${info.hash}</code></span>
+                    
+                    <span class="info-label">Filename:</span>
+                    <span>${info.filename || 'N/A'}</span>
+                    
+                    <span class="info-label">Size:</span>
+                    <span>${info.size_mb} MB (${info.size.toLocaleString()} bytes)</span>
+                    
+                    <span class="info-label">MIME Type:</span>
+                    <span>${info.mime_type || 'unknown'}</span>
+                    
+                    <span class="info-label">Extension:</span>
+                    <span>${info.extension || 'N/A'}</span>
+                    
+                    <span class="info-label">Created:</span>
+                    <span>${info.created_at || 'N/A'}</span>
+                    
+                    <span class="info-label">Modified:</span>
+                    <span>${info.modified_at || 'N/A'}</span>
+                    
+                    <span class="info-label">Imported:</span>
+                    <span>${info.imported_at}</span>
+                    
+                    <span class="info-label">Locations:</span>
+                    <span>${info.locations.length}</span>
+                </div>
+                
+                <h3>File Locations</h3>
                 ${info.locations.map(loc => `
-                    <div class="file-path" style="margin:0.5rem 0;">
-                        <strong>${loc.source}</strong>: ${loc.path}<br>
+                    <div style="background: #f8f9fa; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px;">
+                        <strong>${loc.source}</strong>: <code>${loc.path}</code><br>
                         <small>Discovered: ${loc.discovered_at}</small>
                     </div>
                 `).join('')}
-                ${info.tags.length ? `<p><strong>Tags:</strong> ${info.tags.join(', ')}</p>` : ''}
-                <p><a href="/file/${hash}" target="_blank">Open File</a></p>
+                
+                ${info.tags && info.tags.length ? `
+                    <h3>Tags</h3>
+                    <p>${info.tags.map(t => `<span class="tag">${t}</span>`).join('')}</p>
+                ` : ''}
+                
+                <p style="margin-top: 1rem;"><a href="${fileUrl}" target="_blank">Open/Download File</a></p>
             `;
             document.getElementById('modal').style.display = 'block';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
         
         function closeModal() {
@@ -216,6 +379,7 @@
         function clearFilters() {
             document.getElementById('filter-tag').value = '';
             document.getElementById('filter-source').value = '';
+            document.getElementById('filter-mime').value = '';
             loadFiles();
         }
         

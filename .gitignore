@@ -1,3 +1,4 @@
 storage/
 test_files/
 filedb.db
+.DS_Store

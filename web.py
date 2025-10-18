@@ -22,17 +22,44 @@ def api_files():
     tag = request.args.get('tag')
     source = request.args.get('source')
     
-    results = store.search(tag=tag, source=source)
+    import sqlite3
+    import json
+    
+    conn = sqlite3.connect(store.db_path)
+    
+    query = """
+        SELECT hash, original_paths, size, mime_type, original_filename, 
+               tags, created_at 
+        FROM files WHERE 1=1
+    """
+    params = []
+    
+    if tag:
+        query += " AND tags LIKE ?"
+        params.append(f'%{tag}%')
+    
+    if source:
+        query += " AND original_paths LIKE ?"
+        params.append(f'%{source}%')
+    
+    cursor = conn.execute(query, params)
+    results = cursor.fetchall()
+    conn.close()
     
     files = []
-    for hash_val, paths, size in results:
+    for hash_val, paths_json, size, mime_type, filename, tags_json, created_at in results:
+        paths = json.loads(paths_json)
         files.append({
             'hash': hash_val,
             'hash_short': hash_val[:8],
             'size': size,
             'size_mb': round(size / (1024**2), 2),
             'locations': paths,
-            'location_count': len(paths)
+            'location_count': len(paths),
+            'mime_type': mime_type,
+            'filename': filename,
+            'tags': json.loads(tags_json) if tags_json else [],
+            'created_at': created_at
         })
     
     return jsonify(files)
@@ -126,4 +153,4 @@ def file_info(hash):
     })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5005)

@@ -1,6 +1,9 @@
-# Your File Management System - Summary
+# Art File Management System
+
+File management for the lost.
 
 ## Core Concept
+
 Content-addressable storage with a SQLite database to track everything. Files are deduplicated automatically and can live in multiple locations (local + cloud).
 
 ## Storage Structure
@@ -69,14 +72,7 @@ CREATE TABLE files (
 - **One person system** - SQLite is perfect, no complexity
 - **Gradual migration** - can index legacy locations first, move files later
 - **Extensible** - JSON lets you add features (AI analysis, etc.) without schema changes
-- **Resilient** - multiple backups (easy DB backups)
+- **Resilient** - easy DB backups
 - **Scales to your needs** - handles 1TB/1M files easily
-
-## Next Steps
-
-1. Write ingestion script
-2. Index existing files (Dropbox, iCloud, old drives)
-3. Add cloud sync when ready
-4. Build API layer when needed
 
 Simple, clean, and you're in full control.

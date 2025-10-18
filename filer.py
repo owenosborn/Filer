@@ -7,6 +7,7 @@ import sqlite3
 import hashlib
 import json
 import shutil
+import magic
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -63,6 +64,14 @@ class FileStore:
         parts = filepath.parts[:-1]  # exclude filename
         # Filter out common root directories
         return [p for p in parts if p not in ('/', '.', '..')]
+    
+    def detect_mime_type(self, filepath: Path) -> Optional[str]:
+        """Detect MIME type using python-magic."""
+        try:
+            return magic.from_file(str(filepath), mime=True)
+        except Exception as e:
+            print(f"  Warning: Could not detect MIME type: {e}")
+            return None
     
     def ingest_file(self, filepath: Path, source: str = "local") -> dict:
         """
@@ -144,6 +153,11 @@ class FileStore:
         # Extract file extension
         file_extension = filepath.suffix.lower() if filepath.suffix else ""
         
+        # Detect MIME type
+        mime_type = self.detect_mime_type(filepath)
+        if mime_type:
+            print(f"  → MIME type: {mime_type}")
+        
         # Prepare metadata - store paths as array
         original_paths = [{
             "path": str(filepath),
@@ -154,13 +168,14 @@ class FileStore:
         # Insert into database
         conn.execute("""
             INSERT INTO files (
-                hash, size, file_extension, original_filename,
+                hash, size, mime_type, file_extension, original_filename,
                 created_at, modified_at, imported_at,
                 local_path, original_paths, tags, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             file_hash,
             stat.st_size,
+            mime_type,
             file_extension,
             filepath.name,
             datetime.fromtimestamp(stat.st_ctime),

@@ -81,14 +81,14 @@ def cmd_list(args, store):
     
     return 0
 
-
 def cmd_info(args, store):
     """Show detailed info for a specific file."""
     import sqlite3
     
     conn = sqlite3.connect(store.db_path)
     cursor = conn.execute("""
-        SELECT hash, size, mime_type, created_at, imported_at, 
+        SELECT hash, size, mime_type, file_extension, original_filename,
+               created_at, modified_at, imported_at, 
                local_path, original_paths, tags, metadata
         FROM files WHERE hash = ? OR hash LIKE ?
     """, (args.hash, f"{args.hash}%"))
@@ -100,14 +100,18 @@ def cmd_info(args, store):
         print(f"No file found with hash matching: {args.hash}")
         return 1
     
-    hash_val, size, mime, created, imported, local, paths_json, tags_json, meta_json = result
+    (hash_val, size, mime, extension, filename, 
+     created, modified, imported, local, paths_json, tags_json, meta_json) = result
     
     print(f"\nFile Information:")
     print("=" * 60)
     print(f"Hash:         {hash_val}")
+    print(f"Filename:     {filename}")
+    print(f"Extension:    {extension or 'None'}")
     print(f"Size:         {size / (1024**2):.2f} MB ({size:,} bytes)")
     print(f"MIME Type:    {mime or 'Not detected'}")
     print(f"Created:      {created}")
+    print(f"Modified:     {modified}")
     print(f"Imported:     {imported}")
     print(f"Local Path:   {local}")
     
@@ -127,7 +131,6 @@ def cmd_info(args, store):
         print(json.dumps(metadata, indent=2))
     
     return 0
-
 
 def cmd_stats(args, store):
     """Show database statistics."""

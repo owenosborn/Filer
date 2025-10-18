@@ -26,7 +26,10 @@ CREATE TABLE files (
     hash TEXT PRIMARY KEY,           -- SHA-256 of file content
     size INTEGER,
     mime_type TEXT,
+    original_filename TEXT,
+    file_extension TEXT,
     created_at TIMESTAMP,
+    modified_at TIMESTAMP,
     imported_at TIMESTAMP,
     
     -- Storage locations
@@ -38,19 +41,18 @@ CREATE TABLE files (
     original_source TEXT,            -- "Dropbox", "iCloud", "OldMacDrive"
     
     -- Flexible data
-    tags JSON,                       -- ['Projects', 'MyWebsite', 'vacation']
-    metadata JSON                    -- EXIF, dimensions, AI analysis, etc.
+    tags TEXT,                       -- ['Projects', 'MyWebsite', 'vacation']
+    metadata TEXT                    -- EXIF, dimensions, AI analysis, etc.
 );
 ```
 
 ## Key Features
 
-✅ **Automatic deduplication** - same file stored only once (by hash)  
-✅ **Multiple locations** - track local, cloud, and legacy (Dropbox/iCloud) locations  
-✅ **Preserves context** - original paths saved, auto-extracted as tags  
-✅ **Flexible metadata** - JSON columns for file-specific data  
-✅ **Disaster recovery** - optional sidecar .meta.json files  
-✅ **Simple deployment** - just SQLite + Python, no servers  
+ **Automatic deduplication** - same file stored only once (by hash)  
+ **Multiple locations** - track local, cloud, and legacy (Dropbox/iCloud) locations  
+ **Preserves context** - original paths saved, auto-extracted as tags  
+ **Flexible metadata** - JSON columns for file-specific data  
+ **Simple deployment** - just SQLite + Python, no servers  
 
 ## Implementation (Python)
 
@@ -67,7 +69,7 @@ CREATE TABLE files (
 - **One person system** - SQLite is perfect, no complexity
 - **Gradual migration** - can index legacy locations first, move files later
 - **Extensible** - JSON lets you add features (AI analysis, etc.) without schema changes
-- **Resilient** - multiple backups (DB backups + sidecar files)
+- **Resilient** - multiple backups (easy DB backups)
 - **Scales to your needs** - handles 1TB/1M files easily
 
 ## Next Steps

@@ -14,11 +14,18 @@ from typing import Optional
 
 
 class FileStore:
-    def __init__(self, db_path: str = "filedb.db", storage_root: str = "storage"):
+    def __init__(self, db_path: str = "filedb.db", storage_root: str = "storage", 
+                 verbose: bool = False):
         self.db_path = Path(db_path)
         self.storage_root = Path(storage_root)
+        self.verbose = verbose
         self.storage_root.mkdir(exist_ok=True)
         self.init_database()
+    
+    def _print(self, *args, **kwargs):
+        """Print only if verbose mode is enabled."""
+        if self.verbose:
+            print(*args, **kwargs)
     
     def init_database(self):
         """Initialize the SQLite database with schema."""
@@ -45,7 +52,7 @@ class FileStore:
         """)
         conn.commit()
         conn.close()
-        print(f"Database initialized at {self.db_path}")
+        self._print(f"Database initialized at {self.db_path}")
     
     def hash_file(self, filepath: Path) -> str:
         """Calculate SHA-256 hash of file."""
@@ -70,16 +77,18 @@ class FileStore:
         try:
             return magic.from_file(str(filepath), mime=True)
         except Exception as e:
-            print(f"  Warning: Could not detect MIME type: {e}")
+            self._print(f"  Warning: Could not detect MIME type: {e}")
             return None
     
-    def ingest_file(self, filepath: Path, source: str = "local") -> dict:
+    def ingest_file(self, filepath: Path, source: str = "local", 
+                    additional_tags: list[str] = None) -> dict:
         """
         Ingest a file into the system.
         
         Args:
             filepath: Path to file to ingest
             source: Source identifier (e.g., "Dropbox", "iCloud", "OldMacDrive")
+            additional_tags: Extra tags to add beyond path-extracted tags
             
         Returns:
             Dict with ingestion results
@@ -94,9 +103,9 @@ class FileStore:
         stat = filepath.stat()
         
         # Calculate hash
-        print(f"Hashing {filepath.name}...", end=" ")
+        self._print(f"Hashing {filepath.name}...", end=" ")
         file_hash = self.hash_file(filepath)
-        print(f"[{file_hash[:8]}...]")
+        self._print(f"[{file_hash[:8]}...]")
         
         # Check if already exists
         conn = sqlite3.connect(self.db_path)
@@ -115,7 +124,7 @@ class FileStore:
             
             # Check if this exact path already recorded
             if any(p["path"] == str(filepath) and p["source"] == source for p in existing_paths):
-                print(f"  → Already exists (exact path already recorded)")
+                self._print(f"  → Already exists (exact path already recorded)")
                 conn.close()
                 return {
                     "status": "duplicate",
@@ -132,7 +141,7 @@ class FileStore:
             conn.commit()
             conn.close()
             
-            print(f"  → Added as alternate location (total locations: {len(existing_paths)})")
+            self._print(f"  → Added as alternate location (total locations: {len(existing_paths)})")
             return {
                 "status": "alternate_location",
                 "hash": file_hash,
@@ -144,11 +153,12 @@ class FileStore:
         storage_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Copy file to storage (preserves timestamps)
-        print(f"  → Copying to {storage_path.relative_to(self.storage_root)}")
+        self._print(f"  → Copying to {storage_path.relative_to(self.storage_root)}")
         shutil.copy2(filepath, storage_path)
         
-        # Extract tags from path
-        tags = self.extract_path_tags(filepath)
+        # Extract tags from path and merge with additional tags
+        path_tags = self.extract_path_tags(filepath)
+        all_tags = list(set(path_tags + (additional_tags or [])))  # dedupe
         
         # Extract file extension
         file_extension = filepath.suffix.lower() if filepath.suffix else ""
@@ -156,7 +166,7 @@ class FileStore:
         # Detect MIME type
         mime_type = self.detect_mime_type(filepath)
         if mime_type:
-            print(f"  → MIME type: {mime_type}")
+            self._print(f"  → MIME type: {mime_type}")
         
         # Prepare metadata - store paths as array
         original_paths = [{
@@ -183,13 +193,13 @@ class FileStore:
             datetime.now(),
             str(storage_path),
             json.dumps(original_paths),
-            json.dumps(tags),
+            json.dumps(all_tags),
             json.dumps({})
         ))
         conn.commit()
         conn.close()
         
-        print(f"  ✓ Ingested successfully")
+        self._print(f"  ✓ Ingested successfully")
         return {
             "status": "success",
             "hash": file_hash,
@@ -197,7 +207,7 @@ class FileStore:
         }
     
     def ingest_directory(self, dirpath: Path, source: str = "local", 
-                        recursive: bool = True):
+                        recursive: bool = True, additional_tags: list[str] = None):
         """
         Ingest all files in a directory.
         
@@ -205,26 +215,27 @@ class FileStore:
             dirpath: Directory to ingest
             source: Source identifier
             recursive: Whether to recurse into subdirectories
+            additional_tags: Extra tags to apply to all files
         """
         dirpath = Path(dirpath)
         if not dirpath.is_dir():
-            print(f"Error: {dirpath} is not a directory")
+            self._print(f"Error: {dirpath} is not a directory")
             return
         
         pattern = "**/*" if recursive else "*"
         files = [f for f in dirpath.glob(pattern) if f.is_file()]
         
-        print(f"\nIngesting {len(files)} files from {dirpath}")
-        print("=" * 60)
+        self._print(f"\nIngesting {len(files)} files from {dirpath}")
+        self._print("=" * 60)
         
         stats = {"success": 0, "duplicate": 0, "alternate_location": 0, "error": 0}
         
         for filepath in files:
-            result = self.ingest_file(filepath, source)
+            result = self.ingest_file(filepath, source, additional_tags)
             stats[result["status"]] += 1
         
-        print("\n" + "=" * 60)
-        print(f"Summary: {stats['success']} new, {stats['alternate_location']} alternate locations, " +
+        self._print("\n" + "=" * 60)
+        self._print(f"Summary: {stats['success']} new, {stats['alternate_location']} alternate locations, " +
               f"{stats['duplicate']} exact duplicates, {stats['error']} errors")
     
     def search(self, tag: Optional[str] = None, source: Optional[str] = None):
@@ -285,7 +296,7 @@ class FileStore:
 
 def main():
     """Example usage."""
-    store = FileStore()
+    store = FileStore(verbose=True)
     
     # Example: ingest a directory
     store.ingest_directory(Path("./test_files"), source="TestData", recursive=True)
